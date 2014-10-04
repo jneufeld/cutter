@@ -51,6 +51,7 @@ class SubredditWallpaperCrawler(object):
         self.subreddit_name = subreddit_name
         self.db_connector = db_connector
         self.submission_cache = SubmissionCache(cache_size)
+        self.item_limit = limit
 
         self.known_extensions = ['jpg', 'png']
 
@@ -68,7 +69,7 @@ class SubredditWallpaperCrawler(object):
         Crawls the subreddit, saving wallpapers as it goes.
         """
         try:
-            submissions = self.subreddit.get_hot(limit=10)
+            submissions = self.subreddit.get_hot(limit=self.item_limit)
 
             for submission in submissions:
                 submission_id = submission.id
