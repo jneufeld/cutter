@@ -7,8 +7,8 @@
 # ------------------------------------------------------------------------------
 
 import hashlib
-import praw
 from PIL import Image
+import praw
 import re
 import StringIO
 import urllib2
