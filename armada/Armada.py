@@ -6,7 +6,6 @@
 # Imports
 # ------------------------------------------------------------------------------
 
-from DebugLogging import debug_logging
 from time import sleep
 
 
@@ -19,7 +18,6 @@ class Armada(object):
     Manages a fleet of crawlers.
     """
 
-    @debug_logging
     def __init__(self, pause=900):
         """
         Creates a crawler manager.
@@ -30,7 +28,6 @@ class Armada(object):
         self.crawlers = []
         self.crawl_wait = pause
 
-    @debug_logging
     def run(self):
         """
         Begins indefinite crawling, sequentially calling each crawler, then
@@ -42,7 +39,6 @@ class Armada(object):
 
             sleep(self.crawl_wait)
 
-    @debug_logging
     def add_crawler(self, crawler):
         """
         Adds a crawler to the fleet.

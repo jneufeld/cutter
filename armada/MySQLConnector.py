@@ -6,7 +6,6 @@
 # Imports
 # ------------------------------------------------------------------------------
 
-from DebugLogging import debug_logging
 import mysql.connector
 from mysql.connector import errorcode, IntegrityError
 
@@ -14,6 +13,7 @@ from mysql.connector import errorcode, IntegrityError
 # ------------------------------------------------------------------------------
 # Class
 # ------------------------------------------------------------------------------
+
 class MySQLConnector(object):
     """
     Creates a database connection to a MySQL database.  
@@ -39,7 +39,6 @@ class MySQLConnector(object):
         );
     """
 
-    @debug_logging
     def __init__(self,
             database_name,
             username,
@@ -71,7 +70,6 @@ class MySQLConnector(object):
         if self.connection == None:
             raise Exception('Unable to connect to database.')
 
-    @debug_logging
     def get_connection(self):
         """
         Creates connection to the database or swallows the exception and prints

@@ -6,7 +6,6 @@
 # Imports
 # ------------------------------------------------------------------------------
 
-from DebugLogging import debug_logging
 import hashlib
 import praw
 from PIL import Image
@@ -25,7 +24,6 @@ class SubredditWallpaperCrawler(object):
     found matching given criteria.
     """
 
-    @debug_logging
     def __init__(self, subreddit_name, db_connector):
         """
         Creates a subreddit wallpaper crawler.
@@ -46,7 +44,6 @@ class SubredditWallpaperCrawler(object):
         reddit = praw.Reddit(user_agent=self.user_agent)
         self.subreddit = reddit.get_subreddit(self.subreddit_name)
 
-    @debug_logging
     def crawl(self):
         """
         Crawls the subreddit, saving wallpapers as it goes.
@@ -88,7 +85,6 @@ class SubredditWallpaperCrawler(object):
         """
         self.db_connector.store(img, name, keywords, source, img_size)
 
-    @debug_logging
     def already_crawled(self, submission_id):
         """
         Returns true if the given submission ID is in the cache of crawled
@@ -142,7 +138,6 @@ class SubredditWallpaperCrawler(object):
 
         return result
 
-    @debug_logging
     def make_keywords(self, text):
         """
         Create a list of keywords and phrases using the given text.
