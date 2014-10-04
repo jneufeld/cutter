@@ -94,9 +94,9 @@ def make_db_connector(settings):
         result = MySQLConnector(db_settings['database_name'],
             db_settings['username'],
             db_settings['password'],
-            db_settings['host'],
             db_settings['wallpaper_table'],
-            db_settings['keyword_table'])
+            db_settings['keyword_table'],
+            db_settings['host'])
     except Exception as error:
         print 'Unable to create DB connector. Details:\n%s' % error
         exit()
