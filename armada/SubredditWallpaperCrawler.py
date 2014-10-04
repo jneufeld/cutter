@@ -32,6 +32,11 @@ class SubredditWallpaperCrawler(object):
             subreddit_name<string>       -- Name of the subreddit to crawl.
             db_connector<MySQLConnector> -- Database connection object.
         """
+        if not subreddit_name:
+            raise Exception('Subreddit name cannot be empty.')
+        if not db_connector:
+            raise Exception('Database connector must be initialized.')
+
         self.subreddit_name = subreddit_name
         self.db_connector = db_connector
 
@@ -41,36 +46,44 @@ class SubredditWallpaperCrawler(object):
         self.known_extensions = ['jpg', 'png']
 
         self.user_agent = 'cutter -- Wallpaper Scraper 0.1 -- /u/expat_one'
-        reddit = praw.Reddit(user_agent=self.user_agent)
-        self.subreddit = reddit.get_subreddit(self.subreddit_name)
+
+        try:
+            reddit = praw.Reddit(user_agent=self.user_agent)
+            self.subreddit = reddit.get_subreddit(self.subreddit_name)
+        except Exception as error:
+            print 'Unable to connect to Reddit. Details: %s' % error
+            raise error
 
     def crawl(self):
         """
         Crawls the subreddit, saving wallpapers as it goes.
         """
-        submissions = self.subreddit.get_hot(limit=10)
+        try:
+            submissions = self.subreddit.get_hot(limit=10)
 
-        for submission in submissions:
-            submission_id = submission.id
+            for submission in submissions:
+                submission_id = submission.id
 
-            if self.already_crawled(submission_id):
-                continue
+                if self.already_crawled(submission_id):
+                    continue
 
-            url = submission.url
-            image = self.get_image(url)
+                url = submission.url
+                image = self.get_image(url)
 
-            if image != False:
-                source = submission.permalink
-                nsfw = True if submission.over_18 else False
+                if image != False:
+                    source = submission.permalink
+                    nsfw = True if submission.over_18 else False
 
-                name = hashlib.md5(url).hexdigest()[:10]
-                keywords = self.make_keywords(submission.title)
-                size = self.get_img_size(image)
+                    name = hashlib.md5(url).hexdigest()[:10]
+                    keywords = self.make_keywords(submission.title)
+                    size = self.get_img_size(image)
 
-                if nsfw:
-                    keywords.append('nsfw')
+                    if nsfw:
+                        keywords.append('nsfw')
 
-                self.store(image, name, keywords, source, size)
+                    self.store(image, name, keywords, source, size)
+        except Exception as error:
+            print 'Crawling failed. Details: %s' % error
 
     def store(self, img, name, keywords, source, img_size):
         """
@@ -83,7 +96,10 @@ class SubredditWallpaperCrawler(object):
             source<string>     -- Absolute URL to the image source.
             img_size<string>   -- Dimensions of the image.
         """
-        self.db_connector.store(img, name, keywords, source, img_size)
+        try:
+            self.db_connector.store(img, name, keywords, source, img_size)
+        except Exception as error:
+            print 'Unable to save wallpaper. Details: %s' % error
 
     def already_crawled(self, submission_id):
         """
@@ -109,7 +125,7 @@ class SubredditWallpaperCrawler(object):
 
     def get_image(self, url, recurse=True):
         """
-        Get the image, either directory or by scanning the link to find it.
+        Get the image, either directly or by scanning the link to find it.
 
         Arguments:
             url<string>      -- Absolute URL to image or page hosting image.
