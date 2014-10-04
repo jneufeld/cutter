@@ -57,6 +57,19 @@ class MySQLConnector(object):
             keyword_table<string>   -- Table to write keywords to.
             host<string>            -- Optional host address.
         """
+        if not database_name:
+            raise Exception('Database name must not be empty.')
+        if not username:
+            raise Exception('Database username name must not be empty.')
+        if not password:
+            raise Exception('Database password must not be empty.')
+        if not wallpaper_table:
+            raise Exception('Wallpaper table name must not be empty.')
+        if not keyword_table:
+            raise Exception('Keyword table name must not be empty.')
+        if not host:
+            raise Exception('Host name must not be empty.')
+
         self.db_name = database_name
         self.wallpaper_table = wallpaper_table
         self.keyword_table = keyword_table
@@ -107,6 +120,17 @@ class MySQLConnector(object):
             source<string>     -- Absolute URL to the source of the image.
             size<(int, int)>   -- Contains width and height of image.
         """
+        if not image:
+            raise Exception('Cannot write empty image to DB.')
+        if not name:
+            raise Exception('Cannot write empty image name to DB.')
+        if not keywords:
+            raise Exception('Cannot write image to DB without keywords.')
+        if not source:
+            raise Exception('Cannot write image to DB without source URL.')
+        if not size or len(size) != 2:
+            raise Exception('Cannot write image to DB without size data.')
+
         cursor = self.connection.cursor()
 
         wrote = self.write_wallpaper(cursor,
@@ -149,6 +173,8 @@ class MySQLConnector(object):
             result = True
         except IntegrityError as error:
             print 'Unable to add %s to Wallpapers, duplicate entry.' % name
+        except Exception as error:
+            print 'Unable to add %s to Wallpapers. Details: %s' % (name, error)
 
         return result
 
@@ -165,8 +191,12 @@ class MySQLConnector(object):
         keyword_query = (insert_line + 'VALUES (%s, %s)')
 
         for keyword in keywords:
-            keyword_args = (keyword, name)
-            cursor.execute(keyword_query, keyword_args)
+            try:
+                keyword_args = (keyword, name)
+                cursor.execute(keyword_query, keyword_args)
+            except Exception as error:
+                print 'Unable to add %s as keyword. Details: %s.' % (keyword,
+                    error)
 
     def __repr__(self):
         name = ''
