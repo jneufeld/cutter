@@ -121,9 +121,11 @@ def setup_crawlers(settings, armada, db_connector):
                 subreddit = crawler['subreddit']
                 item_limit = crawler['item_limit']
                 cache_size = crawler['cache_size']
+                path = crawler['wallpaper_path']
 
                 sub_crawler = SubredditWallpaperCrawler(subreddit,
                     db_connector,
+                    path,
                     item_limit,
                     cache_size)
                 armada.add_crawler(sub_crawler)

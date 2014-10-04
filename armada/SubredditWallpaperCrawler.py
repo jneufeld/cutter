@@ -7,6 +7,7 @@
 # ------------------------------------------------------------------------------
 
 import hashlib
+from nltk.corpus import stopwords
 from PIL import Image
 import praw
 import re
@@ -26,13 +27,19 @@ class SubredditWallpaperCrawler(object):
     found matching given criteria.
     """
 
-    def __init__(self, subreddit_name, db_connector, limit=25, cache_size=50):
+    def __init__(self, subreddit_name,
+            db_connector,
+            wallpaper_path,
+            limit=25,
+            cache_size=50):
         """
         Creates a subreddit wallpaper crawler.
 
         Arguments:
             subreddit_name<string>       -- Name of the subreddit to crawl.
             db_connector<MySQLConnector> -- Database connection object.
+            wallpaper_path<string>       -- Filesystem path to where wallpapers
+                                            are saved.
             limit<int>                   -- Max number of items to get during
                                             crawl.
             cache_size<int>              -- Size of previously crawled items
@@ -45,12 +52,15 @@ class SubredditWallpaperCrawler(object):
             raise Exception('Subreddit name cannot be empty.')
         if not db_connector:
             raise Exception('Database connector must be initialized.')
+        if not wallpaper_path:
+            raise Exception('Wallpaper path cannot be empty.')
         if limit > self.ITEM_LIMIT:
             message = 'Cannot get more than %d items.' % self.ITEM_LIMIT
             raise Exception(message)
 
         self.subreddit_name = subreddit_name
         self.db_connector = db_connector
+        self.wallpaper_path = wallpaper_path
         self.submission_cache = SubmissionCache(cache_size)
         self.item_limit = limit
 
@@ -87,9 +97,10 @@ class SubredditWallpaperCrawler(object):
                     source = submission.permalink
                     nsfw = True if submission.over_18 else False
 
-                    name = hashlib.md5(url).hexdigest()[:self.name_length]
-                    keywords = self.make_keywords(submission.title)
+                    name = hashlib.md5(url).hexdigest()[:self.NAME_LENGTH]
+                    name += self.get_img_extension(image)
                     size = self.get_img_size(image)
+                    keywords = self.make_keywords(submission.title)
 
                     if nsfw:
                         keywords.append('nsfw')
@@ -110,10 +121,38 @@ class SubredditWallpaperCrawler(object):
             img_size<string>   -- Dimensions of the image.
         """
         try:
-            self.db_connector.store(img, name, keywords, source, img_size)
-            print 'Successfully stored %s wallpaper' % name
+            wrote = self.write_blob(img, name)
+            if wrote:
+                self.db_connector.store(self.wallpaper_path,
+                    name,
+                    keywords,
+                    source,
+                    img_size)
         except Exception as error:
             print 'Unable to save wallpaper. Details: %s' % error
+
+    def write_blob(self, blob, name):
+        """
+        Write the image blob to the filesystem.
+
+        Arguments:
+            blob<string> -- Image blob.
+            name<string> -- Image name.
+
+        Returns:
+            True if image was successfully written, else False.
+        """
+        result = False
+
+        try:
+            handler = open(self.wallpaper_path + name, 'w')
+            handler.write(blob)
+            result = True
+            print 'Wrote blob to %s' % self.wallpaper_path + name
+        except Exception as error:
+            print 'Unable to write file to filesystem. Details: %s' % error
+
+        return result
 
     def get_image(self, url, recurse=True):
         """
@@ -156,10 +195,15 @@ class SubredditWallpaperCrawler(object):
         Returns:
             List of strings, each string being a keyword or phrase.
         """
+        # TODO:
+        #   - Better way to get words, i.e. words with hyphens and apostrophes
+        #   - Get bigrams and trigrams, i.e. phrases
         result = []
 
-        words = re.sub('\W', ' ', text.lower()).split()
-        result = words # TODO: Remove common words, consider grouping phrases
+        all_words = re.sub('\W', ' ', text.lower()).split()
+        meaningless = set(stopwords.words('english'))
+        meaningful = [w for w in all_words if w not in meaningless]
+        result = list(set(meaningful))
 
         return result
 
@@ -180,6 +224,33 @@ class SubredditWallpaperCrawler(object):
         image_data = Image.open(data)
 
         return image_data.size
+
+    def get_img_extension(self, image):
+        """
+        Return the extension of the image.
+
+        Arguments:
+            image<string> -- Raw text blob of the image.
+
+        Returns:
+            String containing the file extension, including the fullstop.
+        """
+        result = ''
+
+        data = StringIO.StringIO()
+        data.write(image)
+        data.seek(0)
+
+        image_data = Image.open(data)
+
+        if image_data.format == 'JPEG':
+            result = '.jpg'
+        elif image_data.format == 'PNG':
+            result = '.png'
+        else:
+            print 'Unknown image extension: %s' % image_data.format
+
+        return result
 
     def __repr__(self):
         name = ''

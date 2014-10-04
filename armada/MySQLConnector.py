@@ -21,11 +21,11 @@ class MySQLConnector(object):
     For the sake of documentation, here is the Wallpapers table:
 
         CREATE TABLE IF NOT EXISTS Wallpapers (
-            name VARCHAR(10),
+            name VARCHAR(32),
             source VARCHAR(1024) NOT NULL,
             img_height INT NOT NULL,
             img_width INT NOT NULL,
-            image_blob BLOB NOT NULL,
+            path VARCHAR(256) NOT NULL,
             PRIMARY KEY (name)
         );
 
@@ -33,7 +33,7 @@ class MySQLConnector(object):
 
         CREATE TABLE IF NOT EXISTS Keywords (
             word VARCHAR(32),
-            name VARCHAR(10),
+            name VARCHAR(32),
             PRIMARY KEY (word, name),
             FOREIGN KEY (name) REFERENCES Wallpapers(name)
         );
@@ -109,19 +109,19 @@ class MySQLConnector(object):
 
         return result
 
-    def store(self, image, name, keywords, source, size):
+    def store(self, path, name, keywords, source, size):
         """
-        Stores the image and its metadata.
+        Stores the image metadata.
 
         Arguments:
-            image<string>      -- Image to store, in blob form.
-            name<string>       -- Hashed name of image.
+            path<string>       -- Filesystem path to image.
+            name<string>       -- Hashed name of image, including extension.
             keywords<[string]> -- Keywords describing the image.
             source<string>     -- Absolute URL to the source of the image.
             size<(int, int)>   -- Contains width and height of image.
         """
-        if not image:
-            raise Exception('Cannot write empty image to DB.')
+        if not path:
+            raise Exception('Cannot write empty filesystem path to DB.')
         if not name:
             raise Exception('Cannot write empty image name to DB.')
         if not keywords:
@@ -138,7 +138,7 @@ class MySQLConnector(object):
             source,
             size[0],
             size[1],
-            image)
+            path)
 
         if wrote:
             self.write_keywords(cursor, name, keywords)
@@ -146,10 +146,10 @@ class MySQLConnector(object):
         self.connection.commit()
         cursor.close()
 
-    def write_wallpaper(self, cursor, name, source, width, height, image):
+    def write_wallpaper(self, cursor, name, source, width, height, path):
         """
-        Write the wallpaper to the wallpapers table. Return False if the add
-        failed, otherwise return True.
+        Write the wallpaper metadata to the wallpapers table. Return False if
+        the add failed, otherwise return True.
 
         Arguments:
             cursor         -- Database cursor.
@@ -157,20 +157,21 @@ class MySQLConnector(object):
             source<string> -- Absolute URL to the source of the image.
             width<int>     -- Pixel width of the image.
             height<int>    -- Pixel height of the image.
-            image<string>  -- Image to store, in blob form.
+            path<string>   -- Filesystem path to image.
 
         Returns:
-            True if wallpaper was successfuly added.
+            True if wallpaper was successfuly added, else False.
         """
         result = False
 
         insert_line = 'INSERT INTO %s ' % self.wallpaper_table
         wallpaper_query = (insert_line + 'VALUES (%s, %s, %s, %s, %s)')
-        wallpaper_args = (name, source, height, width, image)
+        wallpaper_args = (name, source, height, width, path)
 
         try:
             cursor.execute(wallpaper_query, wallpaper_args)
             result = True
+            print 'Wrote %s to database.' % name
         except IntegrityError as error:
             print 'Unable to add %s to Wallpapers, duplicate entry.' % name
         except Exception as error:
@@ -186,17 +187,29 @@ class MySQLConnector(object):
             cursor           -- Database cursor.
             name<string>     -- Hashed name of image.
             keywords[string] -- Keywords for the wallpaper.
+
+        Returns:
+            True if writes succeeded, else False.
         """
+        result = False
+
         insert_line = 'INSERT INTO %s ' % self.keyword_table
         keyword_query = (insert_line + 'VALUES (%s, %s)')
 
+        failed = False
         for keyword in keywords:
             try:
                 keyword_args = (keyword, name)
                 cursor.execute(keyword_query, keyword_args)
+                print 'Wrote %s for %s to database' % (keyword, name)
             except Exception as error:
                 print 'Unable to add %s as keyword. Details: %s.' % (keyword,
                     error)
+                failed = True
+
+        result = not failed
+
+        return result
 
     def __repr__(self):
         name = ''

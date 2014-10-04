@@ -15,7 +15,10 @@
     "crawlers": [
         {
             "type": "subreddit",
-            "subreddit": "wallpaper"
-        },
+            "subreddit": "wallpaper",
+            "item_limit": 25,
+            "cache_size": 50,
+            "wallpaper_path": "images/"
+        }
     ]
 }
