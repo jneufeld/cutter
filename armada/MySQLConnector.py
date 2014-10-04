@@ -43,9 +43,9 @@ class MySQLConnector(object):
             database_name,
             username,
             password,
-            host,
             wallpaper_table,
-            keyword_table):
+            keyword_table,
+            host='127.0.0.1'):
         """
         Creates a connection to a MySQL database.
 
@@ -53,9 +53,9 @@ class MySQLConnector(object):
             database_name<string>   -- Name of the database to use.
             username<string>        -- Username to connect with.
             password<string>        -- Password to connect with.
-            host<string>            -- Host address.
             wallpaper_table<string> -- Table to write wallpapers to.
             keyword_table<string>   -- Table to write keywords to.
+            host<string>            -- Optional host address.
         """
         self.db_name = database_name
         self.wallpaper_table = wallpaper_table
