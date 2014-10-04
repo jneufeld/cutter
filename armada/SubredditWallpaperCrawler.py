@@ -15,7 +15,7 @@ import urllib2
 
 
 # ------------------------------------------------------------------------------
-# Class
+# Main class
 # ------------------------------------------------------------------------------
 
 class SubredditWallpaperCrawler(object):
@@ -24,24 +24,33 @@ class SubredditWallpaperCrawler(object):
     found matching given criteria.
     """
 
-    def __init__(self, subreddit_name, db_connector):
+    def __init__(self, subreddit_name, db_connector, limit=25, cache_size=50):
         """
         Creates a subreddit wallpaper crawler.
 
         Arguments:
             subreddit_name<string>       -- Name of the subreddit to crawl.
             db_connector<MySQLConnector> -- Database connection object.
+            limit<int>                   -- Max number of items to get during
+                                            crawl.
+            cache_size<int>              -- Size of previously crawled items
+                                            cache.
         """
+        self.ITEM_LIMIT = 50
+
         if not subreddit_name:
             raise Exception('Subreddit name cannot be empty.')
         if not db_connector:
             raise Exception('Database connector must be initialized.')
+        if limit > self.ITEM_LIMIT:
+            message = 'Cannot get more than %d items.' % self.ITEM_LIMIT
+            raise Exception(message)
 
         self.subreddit_name = subreddit_name
         self.db_connector = db_connector
 
         self.submission_cache = [] # TODO: Class for this, a real queue
-        self.cache_size = 10
+        self.cache_size = cache_size
 
         self.known_extensions = ['jpg', 'png']
 

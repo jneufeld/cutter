@@ -119,7 +119,13 @@ def setup_crawlers(settings, armada, db_connector):
 
             if crawler_type == 'subreddit':
                 subreddit = crawler['subreddit']
-                sub_crawler = SubredditWallpaperCrawler(subreddit, db_connector)
+                item_limit = crawler['item_limit']
+                cache_size = crawler['cache_size']
+
+                sub_crawler = SubredditWallpaperCrawler(subreddit,
+                    db_connector,
+                    item_limit,
+                    cache_size)
                 armada.add_crawler(sub_crawler)
             else:
                 print 'Unknown crawler type: %s. Continuing...' % crawler_type
