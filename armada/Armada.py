@@ -37,6 +37,7 @@ class Armada(object):
             for crawler in self.crawlers:
                 crawler.crawl()
 
+            print 'Sleeping for %s seconds' % self.crawl_wait
             sleep(self.crawl_wait)
 
     def add_crawler(self, crawler):
