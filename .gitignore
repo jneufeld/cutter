@@ -1,0 +1,6 @@
+*.pyc
+*.swo
+*.swp
+DebugLogging.py
+config.json
+test.py

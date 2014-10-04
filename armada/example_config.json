@@ -1,0 +1,21 @@
+{
+    "armada":
+    {
+        "crawl_pause": 1800
+    },
+    "database":
+    {
+        "database_name": "test_db",
+        "username": "test_user",
+        "password": "123abc",
+        "host": "127.0.0.1",
+        "wallpaper_table": "Wallpapers",
+        "keyword_table": "Keywords"
+    },
+    "crawlers": [
+        {
+            "type": "subreddit",
+            "subreddit": "wallpaper"
+        },
+    ]
+}
