@@ -20,7 +20,7 @@ class Armada(object):
     """
 
     @debug_logging
-    def __init__(self, pause=30):
+    def __init__(self, pause=900):
         """
         Creates a crawler manager.
 
