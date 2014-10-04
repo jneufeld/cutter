@@ -13,6 +13,8 @@ import re
 import StringIO
 import urllib2
 
+from SubmissionCache import SubmissionCache
+
 
 # ------------------------------------------------------------------------------
 # Main class
@@ -48,9 +50,7 @@ class SubredditWallpaperCrawler(object):
 
         self.subreddit_name = subreddit_name
         self.db_connector = db_connector
-
-        self.submission_cache = [] # TODO: Class for this, a real queue
-        self.cache_size = cache_size
+        self.submission_cache = SubmissionCache(cache_size)
 
         self.known_extensions = ['jpg', 'png']
 
@@ -73,8 +73,10 @@ class SubredditWallpaperCrawler(object):
             for submission in submissions:
                 submission_id = submission.id
 
-                if self.already_crawled(submission_id):
+                if self.submission_cache.has_item(submission_id):
                     continue
+                else:
+                    self.submission_cache.add(submission_id)
 
                 url = submission.url
                 image = self.get_image(url)
@@ -109,28 +111,6 @@ class SubredditWallpaperCrawler(object):
             self.db_connector.store(img, name, keywords, source, img_size)
         except Exception as error:
             print 'Unable to save wallpaper. Details: %s' % error
-
-    def already_crawled(self, submission_id):
-        """
-        Returns true if the given submission ID is in the cache of crawled
-        submissions.
-
-        Arguments:
-            submission_id<string> -- ID of submission.
-
-        Returns:
-            True if the ID is in cache, else False.
-        """
-        result = False
-
-        if submission_id in self.submission_cache:
-            result = True
-        else:
-            if len(self.submission_cache) > self.cache_size:
-                del self.submission_cache[0]
-            self.submission_cache.append(submission_id)
-
-        return result
 
     def get_image(self, url, recurse=True):
         """
