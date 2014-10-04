@@ -39,6 +39,7 @@ class SubredditWallpaperCrawler(object):
                                             cache.
         """
         self.ITEM_LIMIT = 50
+        self.NAME_LENGTH = 10
 
         if not subreddit_name:
             raise Exception('Subreddit name cannot be empty.')
@@ -86,7 +87,7 @@ class SubredditWallpaperCrawler(object):
                     source = submission.permalink
                     nsfw = True if submission.over_18 else False
 
-                    name = hashlib.md5(url).hexdigest()[:10]
+                    name = hashlib.md5(url).hexdigest()[:self.name_length]
                     keywords = self.make_keywords(submission.title)
                     size = self.get_img_size(image)
 
