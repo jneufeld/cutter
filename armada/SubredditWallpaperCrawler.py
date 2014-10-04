@@ -47,6 +47,8 @@ class SubredditWallpaperCrawler(object):
         """
         self.ITEM_LIMIT = 50
         self.NAME_LENGTH = 10
+        self.MIN_IMAGE_WIDTH = 1024
+        self.MIN_IMAGE_HEIGHT = 768
 
         if not subreddit_name:
             raise Exception('Subreddit name cannot be empty.')
@@ -105,7 +107,10 @@ class SubredditWallpaperCrawler(object):
                     if nsfw:
                         keywords.append('nsfw')
 
-                    self.store(image, name, keywords, source, size)
+                    if self.good_size(size[0], size[1]):
+                        self.store(image, name, keywords, source, size)
+                    else:
+                        print '%s too small to save.' % name
         except Exception as error:
             print 'Crawling failed. Details: %s' % error
 
@@ -249,6 +254,24 @@ class SubredditWallpaperCrawler(object):
             result = '.png'
         else:
             print 'Unknown image extension: %s' % image_data.format
+
+        return result
+
+    def good_size(self, width, height):
+        """
+        Tests if the width and height meet the minimum size requirements.
+
+        Arguments:
+            width<int>  -- Width of image.
+            height<int> -- Height of image.
+
+        Returns:
+            True if image meets minimum width and height requirements.
+        """
+        result = False
+
+        if width >= self.MIN_IMAGE_WIDTH and height >= self.MIN_IMAGE_HEIGHT:
+            result = True
 
         return result
 
