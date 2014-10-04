@@ -109,6 +109,7 @@ class SubredditWallpaperCrawler(object):
         """
         try:
             self.db_connector.store(img, name, keywords, source, img_size)
+            print 'Successfully stored %s wallpaper' % name
         except Exception as error:
             print 'Unable to save wallpaper. Details: %s' % error
 
