@@ -14,7 +14,9 @@ import re
 import StringIO
 import urllib2
 
+from FileWriter import FileWriter
 from SubmissionCache import SubmissionCache
+from Wallpaper import Wallpaper
 
 
 # ------------------------------------------------------------------------------
@@ -30,6 +32,7 @@ class SubredditWallpaperCrawler(object):
     def __init__(self, subreddit_name,
             db_connector,
             wallpaper_path,
+            thumbnail_path,
             limit=25,
             cache_size=50):
         """
@@ -63,6 +66,7 @@ class SubredditWallpaperCrawler(object):
         self.subreddit_name = subreddit_name
         self.db_connector = db_connector
         self.wallpaper_path = wallpaper_path
+        self.thumbnail_path = thumbnail_path
         self.submission_cache = SubmissionCache(cache_size)
         self.item_limit = limit
 
@@ -81,67 +85,76 @@ class SubredditWallpaperCrawler(object):
         """
         Crawls the subreddit, saving wallpapers as it goes.
         """
-        try:
-            submissions = self.subreddit.get_hot(limit=self.item_limit)
+        submissions = self.subreddit.get_hot(limit=self.item_limit)
 
-            for submission in submissions:
-                submission_id = submission.id
+        for submission in submissions:
+            try:
+                self.handle_submission(submission)
+            except Exception as error:
+                print 'Unable to handle submission. Details: %s' % error
 
-                if self.submission_cache.has_item(submission_id):
-                    continue
-                else:
-                    self.submission_cache.add(submission_id)
-
-                url = submission.url
-                image = self.get_image(url)
-
-                if image != False:
-                    source = submission.permalink
-                    nsfw = True if submission.over_18 else False
-
-                    name = hashlib.md5(url).hexdigest()[:self.NAME_LENGTH]
-                    name += self.get_img_extension(image)
-                    size = self.get_img_size(image)
-                    keywords = self.make_keywords(submission.title)
-
-                    if nsfw:
-                        keywords.append('nsfw')
-
-                    if self.good_size(size[0], size[1]):
-                        self.store(image, name, keywords, source, size)
-                    else:
-                        print '%s too small to save.' % name
-        except Exception as error:
-            print 'Crawling failed. Details: %s' % error
-
-    def store(self, img, name, keywords, source, img_size):
+    def handle_submission(self, submission):
         """
-        Stores the image and its metadata to the database.
+        Crawl an individual submission. Extract relevant information and
+        possibly save the wallpaper.
 
         Arguments:
-            img<string>        -- The image to save.
-            name<string>       -- Unique name of the image.
-            keywords<[string]> -- List of keywords describing the image.
-            source<string>     -- Absolute URL to the image source.
-            img_size<string>   -- Dimensions of the image.
+            submission -- Single subreddit submission.
+        """
+        submission_id = submission.id
+
+        if self.submission_cache.has_item(submission_id):
+            return
+        else:
+            self.submission_cache.add(submission_id)
+
+        wallpaper = Wallpaper(submission.url)
+
+        if wallpaper != None and self.good_size(wallpaper):
+            keywords = self.make_keywords(submission.title)
+            source = submission.permalink
+
+            if submission.over_18:
+                keywords.append('nsfw')
+
+            self.store(wallpaper, keywords, source)
+
+    def store(self, wallpaper, keywords, source):
+        """
+        Stores the image and thumbnail to the filesystem, and the metadata to
+        the database.
+
+        Arguments:
+            wallpaper<Wallpaper> -- The wallpaper to save.
+            keywords<[string]>   -- List of keywords describing the image.
+            source<string>       -- Absolute URL to the image source.
         """
         try:
-            wrote = self.write_blob(img, name)
-            if wrote:
+            wrote_image = self.write_blob(wallpaper.image,
+                self.wallpaper_path,
+                wallpaper.image_name)
+            wrote_thumbnail = self.write_blob(wallpaper.thumbnail,
+                self.thumbnail_path,
+                wallpaper.image_name)
+
+            if wrote_image and wrote_thumbnail:
                 self.db_connector.store(self.wallpaper_path,
-                    name,
+                    wallpaper.image_name,
                     keywords,
                     source,
-                    img_size)
+                    (wallpaper.image_width, wallpaper.image_height))
         except Exception as error:
             print 'Unable to save wallpaper. Details: %s' % error
+            self.rollback_write(self.wallpaper_path, wallpaper.name)
+            self.rollback_write(self.thumbnail_path, wallpaper.name)
 
-    def write_blob(self, blob, name):
+    def write_blob(self, blob, path, name):
         """
-        Write the image blob to the filesystem.
+        Write the image blob and a thumbnail to the filesystem.
 
         Arguments:
             blob<string> -- Image blob.
+            path<string> -- Absolute filesystem path to write to.
             name<string> -- Image name.
 
         Returns:
@@ -149,44 +162,34 @@ class SubredditWallpaperCrawler(object):
         """
         result = False
 
-        try:
-            handler = open(self.wallpaper_path + name, 'w')
-            handler.write(blob)
+        writer = FileWriter()
+        if not writer.file_exists(path + name):
+            writer.write(blob, path, name)
+            print 'Wrote %s to %s.' % (name, path)
             result = True
-            print 'Wrote blob to %s' % self.wallpaper_path + name
-        except Exception as error:
-            print 'Unable to write file to filesystem. Details: %s' % error
+        else:
+            print '%s already exists at %s. Skipping write.' % (name, path)
 
         return result
 
-    def get_image(self, url, recurse=True):
+    def rollback_write(self, path, name):
         """
-        Get the image, either directly or by scanning the link to find it.
+        Rollback a filesystem write. If the file does not exist, fail silently.
 
         Arguments:
-            url<string>      -- Absolute URL to image or page hosting image.
-            recurse<boolean> -- Optional. If true, recursively search.
+            path<string> -- Absolute filesystem path to file.
+            name<string> -- Image name.
 
         Returns:
-            Image blob data, or False if unable to find image.
+            True if image was successfully removed, else False.
         """
         result = False
 
-        image_extension = url[-3:]
-
-        try:
-            if image_extension in self.known_extensions:
-                result = urllib2.urlopen(url).read()
-            elif 'imgur.com/' in url:
-                page_source = urllib2.urlopen(url).read()
-                link_re = '(?P<base>i\.imgur\.com/\w+\.\w+)"'
-                matches = re.search(link_re, page_source)
-                image_url = 'http://' + matches.group('base')
-                return self.get_image(image_url, False)
-            else:
-                print 'Not sure what to do with this URL: %s' % url
-        except Exception as error:
-            print 'Unable to get image: %s' % error
+        writer = FileWriter()
+        if writer.file_exists(path + name):
+            writer.unwrite(path, name)
+            print 'Rolled back write of %s at %s.' % (name, path)
+            result = True
 
         return result
 
@@ -212,66 +215,28 @@ class SubredditWallpaperCrawler(object):
 
         return result
 
-    def get_img_size(self, image):
+    def good_size(self, wallpaper):
         """
-        Finds the size of the image.
+        Tests if the width and height of the wallpaper meet the minimum size
+        requirements.
 
         Arguments:
-            image<string> -- Raw text blob of the image.
-
-        Returns:
-            Tuple containing the width and height of the image.
-        """
-        data = StringIO.StringIO()
-        data.write(image)
-        data.seek(0)
-
-        image_data = Image.open(data)
-
-        return image_data.size
-
-    def get_img_extension(self, image):
-        """
-        Return the extension of the image.
-
-        Arguments:
-            image<string> -- Raw text blob of the image.
-
-        Returns:
-            String containing the file extension, including the fullstop.
-        """
-        result = ''
-
-        data = StringIO.StringIO()
-        data.write(image)
-        data.seek(0)
-
-        image_data = Image.open(data)
-
-        if image_data.format == 'JPEG':
-            result = '.jpg'
-        elif image_data.format == 'PNG':
-            result = '.png'
-        else:
-            print 'Unknown image extension: %s' % image_data.format
-
-        return result
-
-    def good_size(self, width, height):
-        """
-        Tests if the width and height meet the minimum size requirements.
-
-        Arguments:
-            width<int>  -- Width of image.
-            height<int> -- Height of image.
+            wallpaper<Wallpaper> -- Wallpaper to test size on.
 
         Returns:
             True if image meets minimum width and height requirements.
         """
         result = False
 
+        width, height = wallpaper.image_width, wallpaper.image_height
+        ratio = float(width) / height
+
         if width >= self.MIN_IMAGE_WIDTH and height >= self.MIN_IMAGE_HEIGHT:
             result = True
+        if ratio < 1.0:
+            result = False
+        if ratio > 2.0:
+            result = False
 
         return result
 
